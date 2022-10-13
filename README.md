@@ -1,9 +1,11 @@
-# Quota Alert API Script
+# Automatically Create Alert App Packs Via Script
 
 ## Summary:
 
-- API script to create metric alert rules on all projects for quota management.
-- When defined critical and warning thresholds are met, alerts will send email notifications to all teams assigned to that project.
+- Run this API script to create Alert App Pack rules for ALL projects within an org.
+- :warning: Use this carefully, since this will create alerts for every project in an org. A good future feature for this would be to be able to pass it a list of projects to create alerts for. With great power... :spider_web:	
+- The alerts are created without being assigned any teams. SEs or customers will need to assign teams.
+- The alerts are created with zero actions. SEs will need to encourage customers to add actions (i.e. set up an email/slack notification)
 
 ## Initial Setup
 
