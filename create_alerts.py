@@ -20,6 +20,8 @@ configs = Properties()
 script_report = {}
 
 # MAKE SURE YOU ADD AN ENTRY FOR "type": "issue" or "type": "metric".
+# 
+# TODO: Move JSON into individual files for each alert to make this more readable
 ISSUE_ALERTS = {
     "An Unassigned Error Is Occurring": jsons.dumps({
         "actionMatch":"all",
@@ -89,6 +91,27 @@ ISSUE_ALERTS = {
             "type":"issue"
         })
 
+}
+
+METRIC_ALERTS = {
+    "User Crash-Free Rate Dropped": jsons.dumps({
+        "dataset":"metrics",
+        "aggregate":"percentage(users_crashed, users) AS _crash_rate_alert_aggregate",
+        "query":"",
+        "timeWindow":60,
+        "thresholdPeriod":1,
+        "triggers":[
+            {"label":"critical","alertThreshold":97,"actions":[]},
+            {"label":"warning","alertThreshold":98,"actions":[]}
+        ],
+        "projects":["blog-nextjs-demo"],
+        "environment":None,
+        "resolveThreshold":99,
+        "thresholdType":1,
+        "comparisonDelta":None,
+        "queryType":2,
+        "type": "metric"
+    })
 }
 
 def do_setup():
@@ -199,8 +222,14 @@ def create_alerts():
 
     print('about to create alerts..')
     for proj_name, teams in projects_dict.items():
+        # Create Issue Alerts
         for alert_name, payload in ISSUE_ALERTS.items():
-            json = build_issue_alert_json(proj_name, alert_name, payload)
+            json = build_alert_json(proj_name, alert_name, payload)
+            create_alert(proj_name, alert_name, json, teams)
+
+        # Create Metric Alerts
+        for alert_name, payload in METRIC_ALERTS.items():
+            json = build_alert_json(proj_name, alert_name, payload)
             create_alert(proj_name, alert_name, json, teams)
             
 def create_alert(proj_name, alert_type, alert_payload_json, teams):
@@ -218,15 +247,7 @@ def create_alert(proj_name, alert_type, alert_payload_json, teams):
         
 
 def alert_via_api(proj_name, alert_name, json_data, teams, alert_type):
-    if alert_type == 'issue':
-        url = f'https://sentry.io/api/0/projects/{configs.get("ORG_NAME").data}/{proj_name}/rules/'
-    elif alert_type == 'metric':
-        # metric_alert_via_api(proj_name, alert_name, alert_payload_json, teams)
-        url = "blah fake url"
-    else:
-        script_report["failed"] += 1
-        logging.error(f'alert_via_api: no alert type detected for {alert_name}')
-        return
+    url = generate_url(proj_name, alert_name, alert_type)
 
     try:
         print(f'- Attempting to create alert: "{alert_name}"')
@@ -261,10 +282,23 @@ def no_teams_assigned_to_project(teams):
 def alert_already_exists(alert_name):
     return alert_name in alert_list
 
-def build_issue_alert_json(proj_name, alert_name, payload):
+def build_alert_json(proj_name, alert_name, payload):
     payload = jsons.loads(payload)
     payload['name'] = proj_name + " - " + alert_name
     return jsons.dumps(payload)
+
+def generate_url(proj_name, alert_name, alert_type):
+    url = f'https://sentry.io/api/0/projects/{configs.get("ORG_NAME").data}/{proj_name}'
+    
+    if alert_type == 'issue':
+        url += "/rules/"
+    elif alert_type == 'metric':
+        url += "/alert-rules/"
+    else:
+        script_report["failed"] += 1
+        logging.error(f'alert_via_api: no alert type detected for {alert_name}')
+        return
+    return url
 
 def main(argv):
     global alert_list
