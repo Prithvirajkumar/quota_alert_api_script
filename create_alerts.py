@@ -111,6 +111,81 @@ METRIC_ALERTS = {
         "comparisonDelta":None,
         "queryType":2,
         "type": "metric"
+    }),
+    "Crash-Free Sessions Rate Dropped": jsons.dumps({
+        "dataset":"metrics",
+        "aggregate":"percentage(sessions_crashed, sessions) AS _crash_rate_alert_aggregate",
+        "query":"",
+        "timeWindow":60,
+        "thresholdPeriod":1,
+        "triggers":[
+            {
+                "label":"critical",
+                "alertThreshold":97,
+                "actions":[]
+            },
+            {
+                "label":"warning",
+                "alertThreshold":98,
+                "actions":[]
+            }
+        ],
+        "projects":["blog-nextjs-demo"],
+        "environment":None,
+        "resolveThreshold":99,
+        "thresholdType":1,
+        "comparisonDelta":None,
+        "queryType":2,
+        "type":"metric"
+    }),
+    "Percent Change Threshold in Number of Errors": jsons.dumps({
+            "dataset":"events",
+            "eventTypes":["error"],
+            "aggregate":"count()",
+            "query":"",
+            "timeWindow":60,
+            "thresholdPeriod":1,
+            "triggers":[
+                {
+                    "label":"critical",
+                    "alertThreshold":10,
+                    "actions":[]
+                },
+                {
+                    "label":"warning",
+                    "alertThreshold":5,
+                    "actions":[]
+                }
+            ],
+            "projects":["blog-nextjs-demo"],
+            "environment":None,
+            "resolveThreshold":None,
+            "thresholdType":0,
+            "comparisonDelta":10080,
+            "queryType":0,
+            "type": "metric"
+    }),
+}
+
+HIGH_TRAFFIC = {
+    "High Throughput": jsons.dumps({
+        "dataset":"transactions",
+        "eventTypes":["transaction"],
+        "aggregate":"count()",
+        # "query":"transaction:<transaction name>", # this will get interpolated!!!
+        "timeWindow":60,
+        "thresholdPeriod":1,
+        "triggers":[
+            {"label":"critical","alertThreshold":10,"actions":[]},
+            {"label":"warning","alertThreshold":5,"actions":[]}
+        ],
+        "projects":["blog-nextjs-demo"],
+        "environment":None,
+        "resolveThreshold":None,
+        "thresholdType":0,
+        "comparisonDelta":1440,
+        "queryType":1,
+        "type": "metric"
     })
 }
 
@@ -231,6 +306,16 @@ def create_alerts():
         for alert_name, payload in METRIC_ALERTS.items():
             json = build_alert_json(proj_name, alert_name, payload)
             create_alert(proj_name, alert_name, json, teams)
+
+        # Create High-Traffic Metric Alerts
+        # url_high_traffic_transactions = f'https://sentry.io/api/0/organizations/{configs.get("ORG_NAME").data}/events/?field=transaction&field=project&field=count%28%29&field=avg%28transaction.duration%29&field=p75%28%29&field=p95%28%29&per_page=50&project=5808655&query=event.type%3Atransaction&referrer=api.discover.query-table&sort=-count&statsPeriod=24h'
+        # high_traffic_transactions = requests.get(url, headers = headers)
+        # transactions_to_alert_on = high_traffic_transactions[0:3] # 3 highest-traffic transactions
+        # for transaction in transactions_to_alert_on:
+        #     #proj_name = # determine this via the response
+        #     #
+        #     json = build_alert_json(HIGH_TRAFFIC
+
             
 def create_alert(proj_name, alert_type, alert_payload_json, teams):
     alert_name = json.loads(alert_payload_json)["name"]
@@ -242,9 +327,12 @@ def create_alert(proj_name, alert_type, alert_payload_json, teams):
         script_report["exists"] += 1
         logging.info('create_alert: alert already exists for project ' + proj_name + '!') 
     else:
-        alert_type = json.loads(alert_payload_json)["type"]
-        alert_via_api(proj_name, alert_name, alert_payload_json, teams, alert_type)
-        
+        try:
+            alert_type = json.loads(alert_payload_json)["type"]
+            alert_via_api(proj_name, alert_name, alert_payload_json, teams, alert_type)
+        except Exception as e:
+            script_report["failed"] += 1
+            logging.error(f'create_alert: ensure the alert json has a "type" key with value corresponding to "metric" or "issue" : {alert_name}')
 
 def alert_via_api(proj_name, alert_name, json_data, teams, alert_type):
     url = generate_url(proj_name, alert_name, alert_type)
