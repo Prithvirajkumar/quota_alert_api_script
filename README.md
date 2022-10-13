@@ -3,7 +3,8 @@
 ## Summary:
 
 - Run this API script to create Alert App Pack rules for ALL projects within an org.
-- :warning: Use this carefully, since this will create alerts for every project in an org. A good future feature for this would be to be able to pass it a list of projects to create alerts for. With great power... :spider_web:	
+- :warning: Use this carefully, since this will create alerts for every project in an org. With great power... :spider_web:
+  - A good future feature for this would be to be able to pass it a list of projects to create alerts for. 	
 - The alerts are created without being assigned any teams. SEs or customers will need to assign teams.
 - The alerts are created with zero actions. SEs will need to encourage customers to add actions (i.e. set up an email/slack notification)
 
