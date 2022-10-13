@@ -19,6 +19,78 @@ headers = {}
 configs = Properties()   
 script_report = {}
 
+# MAKE SURE YOU ADD AN ENTRY FOR "type": "issue" or "type": "metric".
+ISSUE_ALERTS = {
+    "An Unassigned Error Is Occurring": jsons.dumps({
+        "actionMatch":"all",
+        "filterMatch":"all",
+        "actions":[],
+        "conditions":[
+            {"id":"sentry.rules.conditions.first_seen_event.FirstSeenEventCondition"},
+            {"interval":"1h","id":"sentry.rules.conditions.event_frequency.EventFrequencyCondition","comparisonType":"count","value":"100"},
+            {"interval":"1h","id":"sentry.rules.conditions.event_frequency.EventUniqueUserFrequencyCondition","comparisonType":"count","value":"100"}
+        ],
+        "filters":[
+            {"targetType":"Unassigned","id":"sentry.rules.filters.assigned_to.AssignedToFilter"}
+        ],
+        "frequency":"10",
+        "type":"issue" # used by this script, not Sentry API, to determine which alert-creation endpoint to use
+    }),
+    "Regression Error Occurred": jsons.dumps({
+      "actionMatch":"all",
+      "filterMatch":"all",
+      "actions":[],
+      "conditions":[
+        {"id":"sentry.rules.conditions.regression_event.RegressionEventCondition"}
+       ],
+       "filters":[
+         {"id":"sentry.rules.filters.latest_release.LatestReleaseFilter"}
+       ],
+       "frequency":"5",
+       "type": "issue" # used by this script, not Sentry API, to determine which alert-creation endpoint to use
+    }),
+    "Users Experiencing Error Frequently": jsons.dumps({
+        "actionMatch":"all",
+        "filterMatch":"all",
+        "actions":[],
+        "conditions": [
+            {
+                "interval":"5m",
+                "id":"sentry.rules.conditions.event_frequency.EventUniqueUserFrequencyCondition",
+                "comparisonType":"count",
+                "value":"20"
+            }
+        ],
+        "filters":[],
+        "frequency":"5",
+        "type": "issue"
+    }),
+    "Error Matches Tag <todo: set tag rule>": jsons.dumps({
+            "actionMatch":"all",
+            "filterMatch":"all",
+            "actions":[],
+            "conditions":[
+                {
+                    "interval":"5m",
+                    "id":"sentry.rules.conditions.event_frequency.EventUniqueUserFrequencyCondition",
+                    "comparisonType":"count",
+                    "value":"50"
+                }
+            ],
+            "filters":[
+                {
+                    "match":"co",
+                    "id":"sentry.rules.filters.tagged_event.TaggedEventFilter",
+                    "key":"exampleKey",
+                    "value":"exampleValue"
+                }
+            ],
+            "frequency":30,
+            "type":"issue"
+        })
+
+}
+
 def do_setup():
     global configs
     global headers
@@ -41,22 +113,20 @@ def do_setup():
         diff = [i for i in required_config_keys + keys if i not in required_config_keys or i not in keys]
         result = len(diff) == 0
         if not result:
-            #print(diff)
             logging.error(f'These config {len(diff)} key(s) are missing from config file: {diff[:5]}')
             sys.exit()
 
-        # for item in required_config_keys:
-        #     if item not in keys:
-        #         print(item)
-        #         logging.error(item + ' is a missing key in your config file.')
-        #         logging.error()
+        for item in required_config_keys:
+            if item not in keys:
+                print(item)
+                logging.error(item + ' is a missing key in your config file.')
+                logging.error()
                 
       
         for key, value in configs.items():
             if(value.data == ''):
                 logging.error('Value for ' + key + ' is missing.')
                 sys.exit()
-            
 
         # Init request headers
         headers = {'Authorization': "Bearer " + configs.get("AUTH_KEY").data, 'Content-Type' : 'application/json'}
@@ -70,7 +140,7 @@ def get_alerts():
     global configs
     global headers
     try: 
-        response = requests.get(f'https://sentry.io/api/0/organizations/{configs.get("ORG_NAME").data}/alert-rules/', headers = headers)
+        response = requests.get(f'https://sentry.io/api/0/organizations/{configs.get("ORG_NAME").data}/combined-rules/', headers = headers)
         store_alerts(response.json())
         while response.links["next"]["results"] == "true":
             response = requests.get(response.links["next"]["url"], headers = headers)
@@ -87,7 +157,6 @@ def store_alerts(json_data):
         else:
             logging.error('store_alerts: could not get existing alert name')
 
-
 def get_projects():
     global headers
     try: 
@@ -98,7 +167,7 @@ def get_projects():
             response = requests.get(response.links["next"]["url"], headers = headers)
             store_projects(response.json()) 
     except Exception as e:
-        logging.error(f'get_project: unable to do get request - {e}')
+        logging.error(f'get_projects: unable to do get request - {e}')
         sys.exit()
 
 
@@ -116,7 +185,7 @@ def store_projects(json_data):
                 projects_dict[project_name].append(team_id)
         except Exception as e:
             logging.error(f'create_project: could not get existing project names - {e}')
-
+            script_report["exists"] += 1
 
 def create_alerts():
     global headers
@@ -130,60 +199,72 @@ def create_alerts():
 
     print('about to create alerts..')
     for proj_name, teams in projects_dict.items():
-        alert_name = proj_name.lower() + alert_rule_suffix
+        for alert_name, payload in ISSUE_ALERTS.items():
+            json = build_issue_alert_json(proj_name, alert_name, payload)
+            create_alert(proj_name, alert_name, json, teams)
+            
+def create_alert(proj_name, alert_type, alert_payload_json, teams):
+    alert_name = json.loads(alert_payload_json)["name"]
+    if no_teams_assigned_to_project(teams):
+        script_report["failed"] += 1
+        logging.error(f'create_alert: failed to create alert for project: {proj_name} - No teams assigned to project')
+
+    elif alert_already_exists(alert_name):
+        script_report["exists"] += 1
+        logging.info('create_alert: alert already exists for project ' + proj_name + '!') 
+    else:
+        alert_type = json.loads(alert_payload_json)["type"]
+        alert_via_api(proj_name, alert_name, alert_payload_json, teams, alert_type)
         
-        if len(teams) == 0:
+
+def alert_via_api(proj_name, alert_name, json_data, teams, alert_type):
+    if alert_type == 'issue':
+        url = f'https://sentry.io/api/0/projects/{configs.get("ORG_NAME").data}/{proj_name}/rules/'
+    elif alert_type == 'metric':
+        # metric_alert_via_api(proj_name, alert_name, alert_payload_json, teams)
+        url = "blah fake url"
+    else:
+        script_report["failed"] += 1
+        logging.error(f'alert_via_api: no alert type detected for {alert_name}')
+        return
+
+    try:
+        print(f'- Attempting to create alert: "{alert_name}"')
+        response = requests.post(
+                    url,
+                    headers = headers, 
+                    data=json_data)
+
+        if(response.status_code in [200, 201]):
+            script_report["success"] += 1
+            logging.info('alert_via_api: Successfully created the metric alert ' + alert_name + ' for project: ' + proj_name)
+        elif (response.status_code == 400):
             script_report["failed"] += 1
-            logging.error(f'create_alert: failed to create alert for project: {proj_name} - No teams assigned to project')
+            logging.error('alert_via_api: could not create alert for project: ' + proj_name)
+            logging.error(str(response.json()) + proj_name)
+        elif (response.status_code == 403):
+            logging.error('alert_via_apis: received the following status code: ' + str(response.status_code) + ' \nYou may be using your user level token without the necessary permissions.  \nPlease assign the AUTH_KEY to your org level token and refer to the README on how to create one.')
+            sys.exit()
+        else: 
+            script_report["failed"] += 1
+            logging.error('alert_via_api: received the following status code: ' + str(response.status_code) + ' for project: ' + proj_name)   
 
-        elif alert_name not in alert_list:
-            try:
-                json_data = build_alert_json(proj_name.lower(), alert_name, teams)
-                response = requests.post(
-                            f'https://sentry.io/api/0/projects/{configs.get("ORG_NAME").data}/{proj_name}/alert-rules/',
-                            headers = headers, 
-                            data=json_data)
+    except Exception as e:
+        script_report["failed"] += 1
+        logging.error(f'alert_via_api: failed to create alert for project : {proj_name} - {e}')
+                   
+    time.sleep(int(configs.get("SLEEP_TIME").data)/1000)
 
-                if(response.status_code in [200, 201]):
-                    script_report["success"] += 1
-                    logging.info('create_alert: Successfully created the metric alert ' + alert_name + ' for project: ' + proj_name)
-                elif (response.status_code == 400):
-                    script_report["failed"] += 1
-                    logging.error('create_alert: could not create alert for project: ' + proj_name)
-                    logging.error(str(response.json()) + proj_name)
-                elif (response.status_code == 403):
-                    logging.error('create_alerts: received the following status code: ' + str(response.status_code) + ' \nYou may be using your user level token without the necessary permissions.  \nPlease assign the AUTH_KEY to your org level token and refer to the README on how to create one.')
-                    sys.exit()
-                else: 
-                    script_report["failed"] += 1
-                    logging.error('create_alert: received the following status code: ' + str(response.status_code) + ' for project: ' + proj_name)   
+def no_teams_assigned_to_project(teams):
+    return len(teams) == 0
 
-            except Exception as e:
-                script_report["failed"] += 1
-                logging.error(f'create_alert: failed to create alert for project : {proj_name} - {e}')
-                           
-            time.sleep(int(configs.get("SLEEP_TIME").data)/1000)
+def alert_already_exists(alert_name):
+    return alert_name in alert_list
 
-        else:
-            script_report["exists"] += 1
-            logging.info('create_alert: alert already exists for project ' + proj_name + '!') 
-
-def build_alert_json(proj_name_lower, alert_name, teams):
-    critical_actions = []
-    warning_actions = []
-    alert_payload_json = jsons.dumps({"dataset":"events","eventTypes":["error","default"],"aggregate":"count()","query":"","timeWindow":60,"triggers":[{"label":"critical","alertThreshold":int(configs.get("CRITICAL").data),"actions":[]},{"label":"warning","alertThreshold":int(configs.get("WARNING").data),"actions":[]}],"projects" : [proj_name_lower],"environment": None ,"resolveThreshold": None,"thresholdType":0,"owner": None,"name":alert_name})
-    json_data = json.loads(alert_payload_json)
-
-    for team_id in teams:
-        action = json.loads(jsons.dumps({"type":"email", "targetType":"team", "targetIdentifier": team_id, "options":None}))
-        critical_actions.append(action)
-        warning_actions.append(action)
-
-    json_data["triggers"][0]["actions"] = critical_actions
-    json_data["triggers"][1]["actions"] = warning_actions
-    json_data = json.dumps(json_data)
-    return json_data
-
+def build_issue_alert_json(proj_name, alert_name, payload):
+    payload = jsons.loads(payload)
+    payload['name'] = proj_name + " - " + alert_name
+    return jsons.dumps(payload)
 
 def main(argv):
     global alert_list
