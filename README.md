@@ -56,6 +56,7 @@ After running the script you will see a log file created with the following nami
 
 Potential error and info logs will be displayed here. 
 
-## Reminder
+## Adding New Alerts to the Script
 
+You can add new alerts to the script. Add them to the relevant `ISSUE_ALERTS` or `METRIC_ALERTS` constant.
 To successfully create a metric alert make sure each project has at least one team assigned to it! 
