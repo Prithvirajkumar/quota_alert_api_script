@@ -43,8 +43,7 @@ Prior to running create_alerts.py, you can configure the following fields in the
 
 Create Alerts for All Projects
 
-    > ```python3 create_alerts.py```
-
+    `$ python3 create_alerts.py`
 
 ## Confirm Alert Creation
 
