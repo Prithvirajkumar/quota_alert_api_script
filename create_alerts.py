@@ -12,6 +12,7 @@ from pathlib import Path
 import time
 import json
 from jproperties import Properties
+from collections.abc import MutableMapping
 
 alert_list = []
 projects_dict = {}
@@ -309,12 +310,16 @@ def create_alerts():
 
         # Create High-Traffic Metric Alerts
         # url_high_traffic_transactions = f'https://sentry.io/api/0/organizations/{configs.get("ORG_NAME").data}/events/?field=transaction&field=project&field=count%28%29&field=avg%28transaction.duration%29&field=p75%28%29&field=p95%28%29&per_page=50&project=5808655&query=event.type%3Atransaction&referrer=api.discover.query-table&sort=-count&statsPeriod=24h'
-        # high_traffic_transactions = requests.get(url, headers = headers)
-        # transactions_to_alert_on = high_traffic_transactions[0:3] # 3 highest-traffic transactions
-        # for transaction in transactions_to_alert_on:
+        # print(url_high_traffic_transactions)
+        # print(headers)
+        # high_traffic_transactions = requests.get(url_high_traffic_transactions, headers = headers)
+        # print(high_traffic_transactions.content)
+        # # transactions_to_alert_on = high_traffic_transactions[0:3] # 3 highest-traffic transactions
+        # # print(transactions_to_alert_on)
+        # # for transaction in transactions_to_alert_on:
         #     #proj_name = # determine this via the response
         #     #
-        #     json = build_alert_json(HIGH_TRAFFIC
+        #     # json = build_alert_json(HIGH_TRAFFIC)
 
             
 def create_alert(proj_name, alert_type, alert_payload_json, teams):
