@@ -377,7 +377,12 @@ def alert_already_exists(alert_name):
 
 def build_alert_json(proj_name, alert_name, payload):
     payload = jsons.loads(payload)
-    payload['name'] = proj_name + " - " + alert_name
+    name = proj_name + " - " + alert_name
+
+    # Alert names can only contain up to 64 characters
+    name64 = name[:60] + " ..." if len(name) > 64 else name
+
+    payload["name"] = name64    
     return jsons.dumps(payload)
 
 def generate_url(proj_name, alert_name, alert_type):
