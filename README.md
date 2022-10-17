@@ -10,7 +10,7 @@
 #### Other things to know
 - The alerts are created without being assigned any teams. SEs or customers will need to assign teams.
 - The alerts are created with zero actions. SEs will need to encourage customers to add actions (i.e. set up an email/slack notification)
-- Alert creation is idempotent, i.e. you can run the script as many times as you want and it will not create duplicate alerts.
+- Alert creation via the script is idempotent, i.e. you can run the script as many times as you want and it will not create duplicate alerts.
 
 ## Initial Setup
 
