@@ -24,20 +24,36 @@ script_report = {}
 # 
 # TODO: Move JSON into individual files for each alert to make this more readable
 ISSUE_ALERTS = {
+    # Explaining the unintuitive first alert, An Unassigned Error is Occurring:
+    # So if we have Issue A that was less than 7 days old and had a spike of 100 events/hr,
+    # the above alert would be fired only once for an entire week.
+    # After that 1 week is over, the issue is not classified as new anymore (Issue A's age > 7 days)
+    # which results in only 1 single alert per issue.
     "An Unassigned Error Is Occurring": jsons.dumps({
         "actionMatch":"all",
         "filterMatch":"all",
         "actions":[],
-        "conditions":[
-            {"id":"sentry.rules.conditions.first_seen_event.FirstSeenEventCondition"},
-            {"interval":"1h","id":"sentry.rules.conditions.event_frequency.EventFrequencyCondition","comparisonType":"count","value":"100"},
-            {"interval":"1h","id":"sentry.rules.conditions.event_frequency.EventUniqueUserFrequencyCondition","comparisonType":"count","value":"100"}
-        ],
+        "conditions":[{
+            "interval":"1h",
+            "id":"sentry.rules.conditions.event_frequency.EventFrequencyCondition",
+            "comparisonType":"count",
+            "value":"100"
+        }],
         "filters":[
-            {"targetType":"Unassigned","id":"sentry.rules.filters.assigned_to.AssignedToFilter"}
+            {
+                "comparison_type":"newer",
+                "time":"week",
+                "id":"sentry.rules.filters.age_comparison.AgeComparisonFilter",
+                "value":1,
+                "name":"The issue is newer than 1 week"
+            },
+            {
+                "targetType":"Unassigned",
+                "id":"sentry.rules.filters.assigned_to.AssignedToFilter"
+            }
         ],
-        "frequency":"10",
-        "type":"issue" # used by this script, not Sentry API, to determine which alert-creation endpoint to use
+        "frequency":"10080", #perform actions once weekly
+        "type":"issue"
     }),
     "Regression Error Occurred": jsons.dumps({
       "actionMatch":"all",
