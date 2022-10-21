@@ -272,26 +272,32 @@ def store_alerts(json_data):
         else:
             logging.error('store_alerts: could not get existing alert name')
 
-def get_projects():
+def get_projects(projects_to_operate_on):
     global headers
     try: 
         response = requests.get(f' https://sentry.io/api/0/organizations/{configs.get("ORG_NAME").data}/projects/', headers = headers)
-        store_projects(response.json())
+        store_projects(response.json(), projects_to_operate_on)
 
         while response.links["next"]["results"] == "true":
             response = requests.get(response.links["next"]["url"], headers = headers)
-            store_projects(response.json()) 
+            store_projects(response.json(), projects_to_operate_on)
     except Exception as e:
         logging.error(f'get_projects: unable to do get request - {e}')
         sys.exit()
 
 
-def store_projects(json_data):
+def store_projects(json_data, projects_to_operate_on):
     global projects_dict
 
     for project in json_data:
         try:
             project_name = project["slug"]
+
+            if projects_to_operate_on and project_name not in projects_to_operate_on:
+                # if we've specified projects to operate on, and this isn't one of them
+                # -- then skip adding alerts for this project
+                continue
+
             teams = project["teams"]
             projects_dict[project_name] = list()
        
@@ -421,9 +427,11 @@ def main(argv):
     global script_report
     global current_datetime
 
+    projects_to_operate_on = argv
+
     do_setup()    
     get_alerts()
-    get_projects()
+    get_projects(projects_to_operate_on)
     create_alerts()
 
     # Print final script status
