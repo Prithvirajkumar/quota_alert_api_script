@@ -3,9 +3,9 @@
 ## Summary:
 
 #### The essentials
-- Run this API script to create Alert App Pack rules for ALL projects within an org.
-- :warning: Use the script carefully; it will create alerts for every project in an org. With great power... :spider_web:
-  - A good future feature for this would be to be able to pass it a list of projects to create alerts for. 	
+- Run this API script to create Alert App Pack rules for projects within an org.
+- :warning: By default, it will create alerts for every project in an org.
+- You can also pass a list of projects to create alerts for (see Run Script section)
   
 #### Other things to know
 - The alerts are created without being assigned any teams. SEs or customers will need to assign teams.
@@ -47,7 +47,14 @@ Prior to running create_alerts.py, you can configure the following fields in the
 
 Create Alerts for All Projects
 
-    `$ python3 create_alerts.py`
+```
+// Create alerts for ALL projects
+$ python3 create_alerts.py
+
+// Create alerts only for specified projects by passing one or more project slugs
+// as command-line arguments.
+$ python3 create_alerts.py myproj-javascript otherprojname-python third-proj-react
+```
 
 ## Confirm Alert Creation
 
