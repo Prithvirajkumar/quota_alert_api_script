@@ -429,7 +429,15 @@ def main(argv):
 
     projects_to_operate_on = argv
 
-    do_setup()    
+    do_setup() 
+
+
+    if not projects_to_operate_on:
+        selection = input(f"Caution: you are about to create alerts for all projects in {configs.get('ORG_NAME').data}.\n  - Continue? y/n:\n")
+        if selection != "y":
+            print("'y' not selected. Exiting program.")
+            sys.exit()
+
     get_alerts()
     get_projects(projects_to_operate_on)
     create_alerts()
