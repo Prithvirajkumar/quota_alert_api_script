@@ -61,6 +61,28 @@ $ python3 create_alerts.py myproj-javascript otherprojname-python third-proj-rea
 1. To confirm via UI navigate to the Alerts page to view the created alerts.
 2. By running python3 create_alerts.py a second time you can confirm if the alert already exists. (Check the log file for `"alert already exists for + [project name]!"`)
 
+## How To Present Alerts to the Customer
+
+This script creates alerts with:
+- no specified action
+- certain default values that can and should change based on customer needs
+
+You should walk the customer through the alerts you've created, on a call. Explain that they need to enable an action for any alerts they're interested in, and point out a few values that have been configured with defaults, that they can change as desired.
+
+For example:
+
+1. For the "Regression Error Occurred" alerts, we alert on the latest release. This is a fine default, but let customers know they could change it to remove that filter and alert on ANY regression if they wanted to.
+
+![Screen Shot 2022-10-28 at 7 36 15 PM](https://user-images.githubusercontent.com/12092849/199081488-030da875-243a-4077-a701-f73fc5f470d7.png)
+
+2. For the "Error Matches Tag <todo: set tag rule>", they will need to set a tag in the alert rules, and update the title accordingly.
+
+![error matches tag](https://user-images.githubusercontent.com/12092849/199081908-826ec0dd-9e17-4c2b-aa77-73f8ee02b643.png)
+
+3. In the "Users Experiencing Error Frequently", the default is currently to trigger when an issue is seen by more than 20 users in 5 minutes. Tell the customer they are free to tweak these numbers if there are numbers that make more sense for them.
+
+![Screen Shot 2022-10-28 at 7 42 58 PM](https://user-images.githubusercontent.com/12092849/199081490-03c405a4-108c-4a8d-93fa-31c81dd1cf08.png)
+
 ## Debug and Logging
 
 After running the script you will see a log file created with the following naming convention - `alert_logfile_{current_datetime}.log`
